@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF Annotator with Japanese Support</title>
+  <!-- Load pdf-lib from CDN -->
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+  <h2>PDF Annotator Test</h2>
+  <input type="file" id="file-input" accept="application/pdf" />
+  <button id="save-btn">Save Annotated PDF</button>
+
+  <script>
+    let pdfBytes;
+    let totalPages = 0;
+    let originalSizes = {};
+    let drawLayers = {};
+    let textBoxes = {};
+    let isTransparent = false;
+
+    // Handle file input
+    document.getElementById('file-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      pdfBytes = await file.arrayBuffer();
+
+      const pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+      totalPages = pdfDoc.numPages;
+      const page = await pdfDoc.getPage(1);
+      const viewport = page.getViewport({ scale: 1 });
+      originalSizes[1] = { width: viewport.width, height: viewport.height };
+
+      alert("PDF loaded. Now click 'Save Annotated PDF' to export with Japanese text.");
+    });
+
+    // Generate annotated PDF
+    async function generateAnnotatedPDF() {
+      const pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
+      const pages = pdfLibDoc.getPages();
+
+      // 👉 Load Japanese-capable font (must be in same folder as index.html)
+      const fontUrl = './NotoSansJP-Regular.ttf';
+      const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
+      const jpFont = await pdfLibDoc.embedFont(fontBytes, { subset: true });
+
+      // Example: Draw some Japanese text
+      const page = pages[0];
+      page.drawText('これはテストです (This is a test)', {
+        x: 50,
+        y: 700,
+        size: 20,
+        font: jpFont,
+        color: PDFLib.rgb(0, 0, 0)
+      });
+
+      const pdfData = await pdfLibDoc.save();
+      return new Blob([pdfData], { type: 'application/pdf' });
+    }
+
+    // Save button
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      if (!pdfBytes) return alert("Load a PDF first!");
+
+      try {
+        const blob = await generateAnnotatedPDF();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'annotated.pdf';
+        link.click();
+      } catch (err) {
+        console.error("❌ Error:", err);
+        alert("Error saving PDF: " + err.message);
+      }
+    });
+  </script>
+
+  <!-- Load pdf.js (for loading PDF in browser, not for saving) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
+</body>
+</html>
